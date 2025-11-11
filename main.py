@@ -1,3 +1,4 @@
+
 import flet as ft
 from model import AppModel
 from view import AppView
@@ -8,8 +9,9 @@ class AppController:
         self.model = AppModel()
         self.view = AppView(self)
         
-        # Estado de la aplicación
+
         self.is_logged_in = False
+        self.current_user_role = None 
         self.current_section = None
         self.search_query = ""
         self.active_filter = "all"
@@ -26,13 +28,22 @@ class AppController:
 
     def handle_login(self, username, password):
         """Manejador para el evento de inicio de sesión."""
-        if self.model.authenticate(username, password):
+        
+        self.view.clear_login_error() 
+        user_role = self.model.authenticate(username, password)
+        
+        if user_role:
             self.is_logged_in = True
+            self.current_user_role = user_role
             self.render()
+        else:
+            print(f"Intento de login fallido para: {username}")
+            self.view.show_login_error("Usuario o contraseña incorrectos.")
 
     def handle_logout(self, e):
         """Manejador para el evento de cierre de sesión."""
         self.is_logged_in = False
+        self.current_user_role = None 
         self.current_section = None
         self.render()
 
@@ -54,12 +65,14 @@ class AppController:
         self.search_query = query.lower()
         self.update_dynamic_list(section)
 
+    # --- ¡ARREGLO AQUÍ! ---
     def handle_filter_change(self, section, filter_type):
         """
         Manejador para los clics en los botones de filtro.
         """
         self.active_filter = filter_type
-        self.render() 
+        self.render()
+
 
     def handle_earnings_tab_change(self, tab_name):
         """
@@ -72,6 +85,7 @@ class AppController:
         """
         Pide datos filtrados al modelo y le dice a la vista que
         actualice solo la lista de elementos.
+        (Esta función se usa ahora SOLO para la búsqueda)
         """
         if section == 'cashiers':
             data = self.model.get_cashiers(self.active_filter, self.search_query)
@@ -104,13 +118,19 @@ class AppController:
             
             elif section == "cashiers":
                 stats = self.model.get_cashier_stats()
+                # Al llamar a render(), los datos se obtienen aquí
                 data = self.model.get_cashiers(self.active_filter, self.search_query)
                 view_to_render = self.view.build_cashier_section(data, stats, self.active_filter)
             
             elif section == "maintenance":
-                stats = self.model.get_maintenance_stats()
-                data = self.model.get_maintenance_tasks(self.search_query)
-                view_to_render = self.view.build_maintenance_section(data, stats)
+                if self.current_user_role == 'admin':
+                    stats = self.model.get_maintenance_stats()
+                    data = self.model.get_maintenance_tasks(self.search_query)
+                    view_to_render = self.view.build_maintenance_section(data, stats)
+                else:
+                    self.current_section = None 
+                    stats = self.model.get_dashboard_stats()
+                    view_to_render = self.view.build_dashboard(stats)
             
             elif section == "inventory":
                 stats = self.model.get_inventory_stats()
@@ -123,8 +143,13 @@ class AppController:
                 view_to_render = self.view.build_sales_section(data, stats, self.active_filter)
 
             elif section == "earnings":
-                data = self.model.get_earnings_data()
-                view_to_render = self.view.build_earnings_section(data, self.active_earnings_tab)
+                if self.current_user_role == 'admin':
+                    data = self.model.get_earnings_data()
+                    view_to_render = self.view.build_earnings_section(data, self.active_earnings_tab)
+                else:
+                    self.current_section = None 
+                    stats = self.model.get_dashboard_stats()
+                    view_to_render = self.view.build_dashboard(stats)
 
         if view_to_render:
             self.page.add(view_to_render)
@@ -137,17 +162,13 @@ def main(page: ft.Page):
     page.bgcolor = "#000000" 
     page.padding = 0
       
-    # 1. Establece las propiedades de tamaño (393x852)
     page.window_width = 393
     page.window_height = 852 
-    page.window_resizable = False # 2. (IMPORTANTE) Bloquea la ventana para que no se pueda cambiar de tamaño
+    page.window_resizable = False
     page.update() 
     
-
     app = AppController(page)
     app.start()
 
 if __name__ == "__main__":
-    # Al añadir "view=ft.AppView.FLET_APP", forzamos la apertura
-    # en una ventana de escritorio nativa en lugar de un navegador.
     ft.app(target=main, view=ft.AppView.FLET_APP)
