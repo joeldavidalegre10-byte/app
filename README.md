@@ -28,7 +28,7 @@ Actúa como el intermediario: la Vista nunca habla directamente con el Modelo, y
 
 Maneja todas las acciones del usuario.
 
-🚀 Flujo de Funcionamiento Paso a Paso
+Flujo de Funcionamiento Paso a Paso
 Así es como funciona todo junto cuando usas la aplicación:
 
 Inicio y Login:
